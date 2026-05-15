@@ -5,16 +5,23 @@ Analyses Home Assistant energy meter history exported as CSV.
 
 Expected CSV columns:
   entity_id    - sensor name (ignored, single-sensor files assumed)
-  state        - cumulative meter reading in MWh (Fronius meter default)
+  state        - cumulative meter reading (MWh or kWh — see flags below)
   last_changed - UTC ISO8601 timestamp
+
+"unavailable" state rows are forward-filled from the last valid reading
+rather than dropped or zeroed, preserving accurate diff/consumption values.
 
 Peak hours:    07:00 – 21:00 NZDT/NZST (Pacific/Auckland)
 Off-Peak hours: 21:00 – 07:00 NZDT/NZST (Pacific/Auckland)
 
 Usage:
-  python energy_analysis.py                        # uses INPUT_FILE below
-  python energy_analysis.py my_export.csv          # pass file as argument
-  python energy_analysis.py my_export.csv --xlsx   # also write Excel output
+  python energy_analysis.py                         # uses INPUT_FILE + UNIT below
+  python energy_analysis.py data.csv                # pass file as argument
+  python energy_analysis.py data.csv --mwh          # treat state values as MWh
+  python energy_analysis.py data.csv --kwh          # treat state values as kWh
+  python energy_analysis.py data.csv --kwh --xlsx   # also write Excel output
+
+  --mwh / --kwh override the UNIT config variable below.
 """
 
 import sys
@@ -30,9 +37,19 @@ SPIKE_FILTER = 100                    # max plausible kWh per reading interval
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+def resolve_unit() -> str:
+    """Return 'MWh' or 'kWh': CLI flags --mwh/--kwh override the UNIT config."""
+    if "--mwh" in sys.argv:
+        return "MWh"
+    if "--kwh" in sys.argv:
+        return "kWh"
+    return UNIT
+
+
 def load_and_prepare(filepath: str) -> pd.DataFrame:
-    """Load CSV, convert timezone, compute consumption per interval."""
-    print(f"Loading {filepath} …")
+    """Load CSV, forward-fill unavailable rows, compute consumption per interval."""
+    unit = resolve_unit()
+    print(f"Loading {filepath} … (unit: {unit})")
     df = pd.read_csv(filepath)
 
     required = {"state", "last_changed"}
@@ -41,20 +58,32 @@ def load_and_prepare(filepath: str) -> pd.DataFrame:
         raise ValueError(f"CSV is missing columns: {missing}")
 
     df["last_changed"] = pd.to_datetime(df["last_changed"], utc=True)
-    df["state"] = pd.to_numeric(df["state"], errors="coerce")
-    df = df.dropna(subset=["state", "last_changed"])
     df = df.sort_values("last_changed").reset_index(drop=True)
+
+    # Replace "unavailable" (and any other non-numeric strings) with NaN,
+    # then forward-fill so diffs across those rows stay correct.
+    # We do NOT drop or zero-fill — dropping creates a false spike on the next
+    # diff; zero-filling creates a false drop then spike pair.
+    df["state"] = df["state"].replace("unavailable", pd.NA)
+    df["state"] = pd.to_numeric(df["state"], errors="coerce")
+    n_unavail = df["state"].isna().sum()
+    if n_unavail:
+        print(f"  ℹ  Forward-filled {n_unavail} unavailable/non-numeric rows")
+    df["state"] = df["state"].ffill()
+    # Drop any leading rows where there was nothing to fill from
+    df = df.dropna(subset=["state", "last_changed"]).reset_index(drop=True)
 
     # Convert to local time
     df["nzdt"] = df["last_changed"].dt.tz_convert(TIMEZONE)
 
     # Convert MWh → kWh if needed
-    if UNIT.upper() == "MWH":
+    if unit.upper() == "MWH":
         df["state_kwh"] = df["state"] * 1000
     else:
         df["state_kwh"] = df["state"]
 
     # Consumption = diff between consecutive readings
+    # First row diff is NaN → treat as 0 (no prior reading to compare)
     df["consumption_kwh"] = df["state_kwh"].diff().fillna(0)
 
     # Filter out negatives (meter resets) and spikes (data gaps)
@@ -63,17 +92,19 @@ def load_and_prepare(filepath: str) -> pd.DataFrame:
     n_dropped = n_before - len(df)
     if n_dropped:
         print(f"  ⚠  Dropped {n_dropped} rows (negative diffs or spikes > {SPIKE_FILTER} kWh)")
+    else:
+        print(f"  ✓  No rows dropped by spike/negative filter")
 
     # Tag peak vs off-peak by start time of each interval
     df["period"] = df["nzdt"].apply(
         lambda t: "Peak" if PEAK_START <= t.hour < PEAK_END else "Off-Peak"
     )
-    df["month"] = df["nzdt"].dt.to_period("M")
+    df["month"] = df["nzdt"].dt.tz_localize(None).dt.to_period("M")
     df["date"]  = df["nzdt"].dt.date
 
     print(f"  {len(df):,} rows | "
           f"{df['nzdt'].min().date()} → {df['nzdt'].max().date()} "
-          f"({df['nzdt'].max().date() - df['nzdt'].min().date()} days)\n")
+          f"({(df['nzdt'].max().date() - df['nzdt'].min().date()).days} days)\n")
     return df
 
 
@@ -173,7 +204,9 @@ def write_excel(df: pd.DataFrame, monthly, daily, output_path: str):
 
 
 def main():
-    filepath = sys.argv[1] if len(sys.argv) > 1 else INPUT_FILE
+    # First positional arg that isn't a flag is the filepath
+    positional = [a for a in sys.argv[1:] if not a.startswith("--")]
+    filepath = positional[0] if positional else INPUT_FILE
     write_xlsx = "--xlsx" in sys.argv
 
     df = load_and_prepare(filepath)
