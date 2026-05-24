@@ -27,7 +27,7 @@ Current-EV ROI uses measured Home Assistant home charging. DC charging is shown 
 | vehicle | annual_km | kwh_per_100km | annual_vehicle_energy_kwh | home_charge_pct | dc_charge_pct | estimated_home_kwh | estimated_dc_kwh | start_date |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Tesla | 26000.0 | 15.3 | 3978.0 | 0.65 | 0.35 | 2,585.70 | 1392.3 | 2023-03-01 |
-| MG | 7000.0 | 19.0 | 1330.0 | 0.5 | 0.5 | 665.00 | 665.0 | 2024-12-01 |
+| MG | 13000.0 | 19.0 | 2470.0 | 0.5 | 0.5 | 1,235.00 | 1235.0 | 2024-12-01 |
 | Home Assistant measured EV charging |  |  |  |  |  | 5,473.52 |  | measurement period |
 
 ## Notes
