@@ -25,7 +25,7 @@ from home_energy_options import (
     build_model_data,
 )
 
-OUTPUT_DIR = Path("analysis_files")
+OUTPUT_DIR = Path("summaries")
 OUTPUT_XLSX = OUTPUT_DIR / "pv_system_roi_analysis.xlsx"
 OUTPUT_MARKDOWN = OUTPUT_DIR / "pv_system_roi_summary.md"
 
@@ -58,8 +58,8 @@ EV_CONTEXT = [
         "vehicle": "MG",
         "annual_km": 13_000,
         "kwh_per_km": 0.190,
-        "home_charge_pct": 0.50,
-        "dc_charge_pct": 0.50,
+        "home_charge_pct": 0.60,
+        "dc_charge_pct": 0.40,
         "start_date": date(2024, 12, 1),
     },
 ]

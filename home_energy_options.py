@@ -24,6 +24,7 @@ import pandas as pd
 
 # Input files -----------------------------------------------------------------
 BASE_DIR = Path("analysis_files")
+EXPORT_DIR = Path("summaries")
 INPUT_FILES = {
     "import": (BASE_DIR / "Import-150525-150526.csv", "MWh"),
     "export": (BASE_DIR / "Energy_Export_160525-150526.csv", "MWh"),
@@ -63,8 +64,8 @@ BIN_FREQUENCY = "5min"
 SPIKE_FILTER_KWH = 100.0
 ADDED_PANEL_COUNTS = range(0, 13)  # 0..12 added 395 W panels.
 
-OUTPUT_XLSX = BASE_DIR / "home_energy_options_analysis.xlsx"
-OUTPUT_MARKDOWN = BASE_DIR / "home_energy_options_summary.md"
+OUTPUT_XLSX = EXPORT_DIR / "home_energy_options_analysis.xlsx"
+OUTPUT_MARKDOWN = EXPORT_DIR / "home_energy_options_summary.md"
 
 
 @dataclass(frozen=True)

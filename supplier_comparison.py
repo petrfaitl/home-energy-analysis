@@ -17,17 +17,18 @@ import pandas as pd
 
 from home_energy_options import build_model_data, ModelData
 
-OUTPUT_DIR = Path("analysis_files")
+OUTPUT_DIR = Path("summaries")
 OUTPUT_XLSX = OUTPUT_DIR / "supplier_comparison.xlsx"
 OUTPUT_MARKDOWN = OUTPUT_DIR / "supplier_comparison_summary.md"
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-BATTERY_KWH = 13.8
+BATTERY_KWH = 8.3
+BATTERY_POWER_LIMIT_KW = 5.0
 
 EV_MILEAGE = {"Tesla": 26_000, "MG": 13_000}
-HOME_CHARGE_PCTS = {"Tesla": 0.65, "MG": 0.50}
+HOME_CHARGE_PCTS = {"Tesla": 0.65, "MG": 0.60}
 KWH_PER_KM = {"Tesla": 0.153, "MG": 0.190}
 ROUND_TRIP_EFFICIENCY = 0.90
 
@@ -35,15 +36,15 @@ ROUND_TRIP_EFFICIENCY = 0.90
 # FULL SUPPLIER DATA (all rows from your table)
 # =============================================================================
 SUPPLIERS = [
-    # Mercury
+    # Mercury EV standard usage - updated 05/2026
     {
         "supplier": "Mercury",
         "tariff": "standard usage",
-        "plan_name": "Mercury - standard usage",
-        "peak_rate": 0.37,
-        "offpeak_rate": 0.37,
-        "night_rate": 0.37,
-        "daily_charge": 1.380,
+        "plan_name": "Mercury EV - standard usage",
+        "peak_rate": 0.4013,
+        "offpeak_rate": 0.3360,
+        "night_rate": 0.3360,
+        "daily_charge": 2.6335,
         "export_rate": 0.120,
         "public_dc_rate": 0.85,
         "gas": True,
@@ -51,18 +52,37 @@ SUPPLIERS = [
         "bottle_rental_per_year": 101.4,
         "dual_fuel_discount": 0.05,
         "rebate": 500,
-        "low_usage_threshold_kwh": None,
-        "night_hours": None,
+        "low_usage_threshold_kwh": 8000,
+        "night_hours": (21, 7),
     },
-    # Octopus Power - Fixed
+    # Mercury EV - low usage - updated 05/2026
     {
-        "supplier": "Octopus Power - Fixed",
+        "supplier": "Mercury",
         "tariff": "low usage",
-        "plan_name": "Octopus Power - Fixed - low usage",
-        "peak_rate": 0.36,
-        "offpeak_rate": 0.29,
-        "night_rate": 0.18,
-        "daily_charge": 1.380,
+        "plan_name": "Mercury EV  - low usage",
+        "peak_rate": 0.4427,
+        "offpeak_rate": 0.3774,
+        "night_rate": 0.3774,
+        "daily_charge": 1.7250,
+        "export_rate": 0.120,
+        "public_dc_rate": 0.85,
+        "gas": True,
+        "bottle_charge_per_year": 253.6,
+        "bottle_rental_per_year": 101.4,
+        "dual_fuel_discount": 0.05,
+        "rebate": 500,
+        "low_usage_threshold_kwh": 8000,
+        "night_hours": (21, 7),
+    },
+    # Octopus Power - Peaker - updated 05/2026
+    {
+        "supplier": "Octopus Power - Peaker",
+        "tariff": "standard usage",
+        "plan_name": "Octopus Power - Peaker - standard usage",
+        "peak_rate": 0.364,
+        "offpeak_rate": 0.272,
+        "night_rate": 0.182,
+        "daily_charge": 3.337,
         "export_rate": 0.130,
         "public_dc_rate": 0.85,
         "gas": False,
@@ -73,16 +93,16 @@ SUPPLIERS = [
         "low_usage_threshold_kwh": None,
         "night_hours": (23, 7),
     },
-    # Octopus Power Flexi
+    # Octopus Power Flexi - updated 05/2026
     {
         "supplier": "Octopus Power Flexi",
         "tariff": "standard usage",
         "plan_name": "Octopus Power Flexi - standard usage",
-        "peak_rate": 0.30,
-        "offpeak_rate": 0.23,
-        "night_rate": 0.15,
-        "daily_charge": 2.445,
-        "export_rate": 0.130,
+        "peak_rate": 0.364,
+        "offpeak_rate": 0.272,
+        "night_rate": 0.182,
+        "daily_charge": 3.337,
+        "export_rate": 0.140,
         "public_dc_rate": 0.85,
         "gas": False,
         "bottle_charge_per_year": 0,
@@ -92,17 +112,36 @@ SUPPLIERS = [
         "low_usage_threshold_kwh": None,
         "night_hours": (23, 7),
     },
-    # Genesis Energy EV - standard
+    # Octopus Power Flexi  - updated 05/2026
+    {
+        "supplier": "Octopus Power Flexi",
+        "tariff": "low usage",
+        "plan_name": "Octopus Power Flexi - low usage",
+        "peak_rate": 0.453,
+        "offpeak_rate": 0.361,
+        "night_rate": 0.226,
+        "daily_charge": 1.725,
+        "export_rate": 0.140,
+        "public_dc_rate": 0.85,
+        "gas": False,
+        "bottle_charge_per_year": 0,
+        "bottle_rental_per_year": 0,
+        "dual_fuel_discount": 0.0,
+        "rebate": 0,
+        "low_usage_threshold_kwh": None,
+        "night_hours": (23, 7),
+    },
+    # Genesis Energy EV - standard - updated 05/2026
     {
         "supplier": "Genesis Energy EV",
         "tariff": "standard usage",
         "plan_name": "Genesis Energy EV - standard usage",
-        "peak_rate": 0.34,
-        "offpeak_rate": 0.17,
-        "night_rate": 0.17,
-        "daily_charge": 2.129,
+        "peak_rate": 0.3778,
+        "offpeak_rate": 0.1818,
+        "night_rate": 0.1818,
+        "daily_charge": 2.4893,
         "export_rate": 0.144,
-        "public_dc_rate": 0.34,
+        "public_dc_rate": 0.3778,
         "gas": True,
         "bottle_charge_per_year": 345.9,
         "bottle_rental_per_year": 69.00,
@@ -111,35 +150,35 @@ SUPPLIERS = [
         "low_usage_threshold_kwh": 8000,
         "night_hours": (21, 7),
     },
-    # Genesis Energy EV - low usage
+    # Genesis Energy EV - low usage - updated 05/2026
     {
         "supplier": "Genesis Energy EV",
         "tariff": "low usage",
         "plan_name": "Genesis Energy EV - low usage",
-        "peak_rate": 0.39,
-        "offpeak_rate": 0.19,
-        "night_rate": 0.19,
-        "daily_charge": 1.035,
+        "peak_rate": 0.414805,
+        "offpeak_rate": 0.207345,
+        "night_rate": 0.207345,
+        "daily_charge": 1.67325,
         "export_rate": 0.144,
-        "public_dc_rate": 0.39,
+        "public_dc_rate": 0.414805,
         "gas": True,
         "bottle_charge_per_year": 345.9,
         "bottle_rental_per_year": 69.00,
-        "dual_fuel_discount": 0.05,
+        "dual_fuel_discount": 0.00,
         "rebate": 0,
         "low_usage_threshold_kwh": 8000,
         "night_hours": (21, 7),
     },
-    # Electric Kiwi Move Master
+    # Electric Kiwi Move Master updated 05/2026
     {
         "supplier": "Electric Kiwi",
         "tariff": "standard usage",
         "plan_name": "Electric Kiwi Move Master - standard usage",
-        "peak_rate": 0.39,
-        "offpeak_rate": 0.27,
-        "night_rate": 0.20,
-        "daily_charge": 1.930,
-        "export_rate": 0.144,
+        "peak_rate": 0.6481,
+        "offpeak_rate": 0.3888,
+        "night_rate": 0.324,
+        "daily_charge": 1.15,
+        "export_rate": 0.23,
         "public_dc_rate": 0.85,
         "gas": False,
         "bottle_charge_per_year": 0,
@@ -149,15 +188,15 @@ SUPPLIERS = [
         "low_usage_threshold_kwh": None,
         "night_hours": (23, 7),
     },
-    # Contact Good Nights - standard
+    # Contact Good Nights - standard - updated 05/2026
     {
         "supplier": "Contact",
         "tariff": "standard usage",
         "plan_name": "Contact Good Nights - standard usage",
-        "peak_rate": 0.29,
-        "offpeak_rate": 0.29,
+        "peak_rate": 0.3864,
+        "offpeak_rate": 0.3864,
         "night_rate": 0.00,
-        "daily_charge": 2.611,
+        "daily_charge": 3.2867,
         "export_rate": 0.120,
         "public_dc_rate": 0.85,
         "gas": True,
@@ -168,15 +207,15 @@ SUPPLIERS = [
         "low_usage_threshold_kwh": None,
         "night_hours": (21, 0),
     },
-    # Contact Good Nights - low usage
+    # Contact Good Nights - low usage - updated 05/2026
     {
         "supplier": "Contact",
         "tariff": "low usage",
         "plan_name": "Contact Good Nights - low usage",
-        "peak_rate": 0.38,
-        "offpeak_rate": 0.38,
+        "peak_rate": 0.4531,
+        "offpeak_rate": 0.4531,
         "night_rate": 0.00,
-        "daily_charge": 1.035,
+        "daily_charge": 2.07,
         "export_rate": 0.120,
         "public_dc_rate": 0.85,
         "gas": True,
@@ -187,15 +226,15 @@ SUPPLIERS = [
         "low_usage_threshold_kwh": None,
         "night_hours": (21, 0),
     },
-    # Contact EV Charge - standard
+    # Contact EV Charge - standard - updated 05/2026
     {
         "supplier": "Contact",
         "tariff": "standard usage",
         "plan_name": "Contact EV Charge - standard usage",
-        "peak_rate": 0.29,
-        "offpeak_rate": 0.29,
-        "night_rate": 0.145,
-        "daily_charge": 2.663,
+        "peak_rate": 0.3864,
+        "offpeak_rate": 0.3864,
+        "night_rate": 0.18975,
+        "daily_charge": 3.402,
         "export_rate": 0.120,
         "public_dc_rate": 0.85,
         "gas": True,
@@ -203,18 +242,18 @@ SUPPLIERS = [
         "bottle_rental_per_year": 0,
         "dual_fuel_discount": 0.0,
         "rebate": 0,
-        "low_usage_threshold_kwh": None,
+        "low_usage_threshold_kwh": 8000,
         "night_hours": (21, 7),
     },
-    # Contact EV Charge - low usage
+    # Contact EV Charge - low usage - updated 05/2026
     {
         "supplier": "Contact",
         "tariff": "low usage",
         "plan_name": "Contact EV Charge - low usage",
-        "peak_rate": 0.37,
-        "offpeak_rate": 0.37,
-        "night_rate": 0.1817,
-        "daily_charge": 1.035,
+        "peak_rate": 0.4462,
+        "offpeak_rate": 0.4462,
+        "night_rate": 0.2231,
+        "daily_charge": 2.07,
         "export_rate": 0.120,
         "public_dc_rate": 0.85,
         "gas": True,
@@ -222,19 +261,19 @@ SUPPLIERS = [
         "bottle_rental_per_year": 0,
         "dual_fuel_discount": 0.0,
         "rebate": 0,
-        "low_usage_threshold_kwh": None,
+        "low_usage_threshold_kwh": 8000,
         "night_hours": (21, 7),
     },
-    # Ecotricity - low usage
+    # Ecotricity - EcoSolar low usage - updated 05/2026
     {
         "supplier": "Ecotricity",
         "tariff": "low usage",
-        "plan_name": "Ecotricity - low usage",
-        "peak_rate": 0.43,
-        "offpeak_rate": 0.2732,
-        "night_rate": 0.2732,
-        "daily_charge": 1.380,
-        "export_rate": 0.155,
+        "plan_name": "Ecotricity - EcoSolar low usage",
+        "peak_rate": 0.4502,
+        "offpeak_rate": 0.2958,
+        "night_rate": 0.2958,
+        "daily_charge": 1.728,
+        "export_rate": 0.1840,
         "public_dc_rate": 0.85,
         "gas": True,
         "bottle_charge_per_year": 0,
@@ -244,16 +283,16 @@ SUPPLIERS = [
         "low_usage_threshold_kwh": None,
         "night_hours": (21, 7),
     },
-    # Ecotricity - standard usage
+    # Ecotricity - Eco Solar - standard usage - updated 05/2026
     {
         "supplier": "Ecotricity",
         "tariff": "standard usage",
-        "plan_name": "Ecotricity - standard usage",
-        "peak_rate": 0.38,
-        "offpeak_rate": 0.233,
-        "night_rate": 0.233,
-        "daily_charge": 2.323,
-        "export_rate": 0.155,
+        "plan_name": "Ecotricity - EcoSolar standard usage",
+        "peak_rate": 0.3995,
+        "offpeak_rate": 0.2451,
+        "night_rate": 0.2451,
+        "daily_charge": 2.8865,
+        "export_rate": 0.1840,
         "public_dc_rate": 0.85,
         "gas": True,
         "bottle_charge_per_year": 0,
@@ -263,61 +302,23 @@ SUPPLIERS = [
         "low_usage_threshold_kwh": None,
         "night_hours": (21, 7),
     },
-    # Ecotricity - wholesale
-    {
-        "supplier": "Ecotricity",
-        "tariff": "wholesale",
-        "plan_name": "Ecotricity - wholesale",
-        "peak_rate": 0.42,
-        "offpeak_rate": 0.2401,
-        "night_rate": 0.2401,
-        "daily_charge": 1.380,
-        "export_rate": 0.137,
-        "public_dc_rate": 0.85,
-        "gas": True,
-        "bottle_charge_per_year": 0,
-        "bottle_rental_per_year": 0,
-        "dual_fuel_discount": 0.0,
-        "rebate": 210,
-        "low_usage_threshold_kwh": None,
-        "night_hours": (21, 7),
-    },
-    # Meridian - low usage
-    {
-        "supplier": "Meridian",
-        "tariff": "low usage",
-        "plan_name": "Meridian - low usage",
-        "peak_rate": 0.32,
-        "offpeak_rate": 0.32,
-        "night_rate": 0.1715,
-        "daily_charge": 0.690,
-        "export_rate": 0.14,
-        "public_dc_rate": 0.85,
-        "gas": False,
-        "bottle_charge_per_year": 0,
-        "bottle_rental_per_year": 0,
-        "dual_fuel_discount": 0.0,
-        "rebate": 0,
-        "low_usage_threshold_kwh": None,
-        "night_hours": (21, 7),
-    },
-    # Meridian - standard usage
+    # Meridian - standard usage - updated 05/2026
     {
         "supplier": "Meridian",
         "tariff": "standard usage",
         "plan_name": "Meridian - standard usage",
-        "peak_rate": 0.27,
-        "offpeak_rate": 0.27,
-        "night_rate": 0.1179,
-        "daily_charge": 1.866,
-        "export_rate": 0.14,
+        "peak_rate": 0.3179,
+        "offpeak_rate": 0.3179,
+        "night_rate": 0.155,
+        "daily_charge": 2.6250,
+        "export_rate": 0.12,
         "public_dc_rate": 0.85,
         "gas": False,
         "bottle_charge_per_year": 0,
         "bottle_rental_per_year": 0,
         "dual_fuel_discount": 0.0,
         "rebate": 0,
-        "low_usage_threshold_kwh": None,
+        "low_usage_threshold_kwh": 8000,
         "night_hours": (21, 7),
     },
 ]
@@ -343,56 +344,162 @@ def get_night_mask(model: ModelData, night_hours: tuple | None) -> np.ndarray:
     start, end = night_hours
     hours = model.interval.index.hour
     if start < end:
-        return (hours >= start) | (hours < end)
-    else:
-        return (hours >= start) | (hours < end)
+        return (hours >= start) & (hours < end)
+    return (hours >= start) | (hours < end)
+
+
+def get_import_rate_vector(supplier: dict, model: ModelData) -> np.ndarray:
+    """Build an interval import-rate vector for the supplier plan."""
+    peak_rate = supplier["peak_rate"]
+    offpeak_rate = supplier.get("offpeak_rate", peak_rate)
+    night_rate = supplier.get("night_rate", offpeak_rate)
+
+    rates = np.where(model.is_peak, peak_rate, offpeak_rate).astype(float)
+    night_mask = get_night_mask(model, supplier.get("night_hours"))
+    rates[night_mask] = night_rate
+    return rates
+
+
+def target_date_for_interval(timestamp: pd.Timestamp) -> object:
+    """Map cheap overnight charging intervals to the peak/discharge date covered."""
+    if timestamp.hour < 7:
+        return timestamp.date()
+    return (timestamp + pd.Timedelta(days=1)).date()
+
+
+def daily_soc_targets(
+    model: ModelData,
+    net: np.ndarray,
+    target_mask: np.ndarray,
+    battery_kwh: float,
+    discharge_eff: float,
+    charge_eff: float,
+) -> dict:
+    """Estimate how much off-peak grid charge is worth carrying into each day."""
+    if battery_kwh <= 0:
+        return {}
+
+    round_trip = charge_eff * discharge_eff
+    capacity_deliverable = battery_kwh * discharge_eff
+    targets = {}
+
+    for day in model.unique_dates:
+        indices = np.where((model.date_values == day) & target_mask)[0]
+        cumulative_need = 0.0
+        max_initial_deliverable_needed = 0.0
+
+        for i in indices:
+            value = float(net[i])
+            if value >= 0:
+                cumulative_need += value
+            else:
+                cumulative_need += value * round_trip
+                cumulative_need = max(cumulative_need, -capacity_deliverable)
+            max_initial_deliverable_needed = max(
+                max_initial_deliverable_needed, cumulative_need
+            )
+
+        targets[day] = min(battery_kwh, max_initial_deliverable_needed / discharge_eff)
+    return targets
 
 
 def simulate_battery_dispatch(
     model: ModelData,
     battery_kwh: float,
-    night_mask: np.ndarray,
+    supplier: dict,
     allow_night_grid_charge: bool = True,
 ) -> dict:
-    """Simple battery model: solar self-consumption + night top-up."""
-    if battery_kwh <= 0:
-        return {
-            "import": model.interval["load"].to_numpy(),
-            "export": model.interval["solar"].to_numpy()
-            - model.interval["load"].to_numpy(),
-        }
-
+    """Tariff-aware battery model: solar self-consumption + cheap-period top-up."""
     load = model.interval["load"].to_numpy(dtype=float)
     solar = model.interval["solar"].to_numpy(dtype=float)
     net = load - solar
 
+    if battery_kwh <= 0:
+        return {"import": np.clip(net, 0, None), "export": np.clip(-net, 0, None)}
+
+    rate_vector = get_import_rate_vector(supplier, model)
+    export_rate = supplier["export_rate"]
+    min_rate = float(rate_vector.min())
+    max_rate = float(rate_vector.max())
+    grid_charge_is_economic = min_rate / ROUND_TRIP_EFFICIENCY < max_rate
+    cheap_mask = rate_vector <= min_rate + 1e-9
+    grid_charge_mask = cheap_mask & grid_charge_is_economic
+
+    # Solar-stored energy should avoid imports where import value exceeds export
+    # opportunity cost. Grid-charged energy is reserved for intervals dear enough
+    # to beat round-trip losses from the cheapest import period.
+    solar_discharge_mask = rate_vector > export_rate / ROUND_TRIP_EFFICIENCY
+    arbitrage_discharge_mask = rate_vector > min_rate / ROUND_TRIP_EFFICIENCY
+    discharge_mask = solar_discharge_mask & (~grid_charge_mask)
+
     charge_eff = np.sqrt(ROUND_TRIP_EFFICIENCY)
     discharge_eff = np.sqrt(ROUND_TRIP_EFFICIENCY)
+    interval_hours = (
+        pd.Timedelta(model.interval.index.freq or "5min").total_seconds() / 3600
+    )
+    max_transfer = BATTERY_POWER_LIMIT_KW * interval_hours
+    grid_targets = daily_soc_targets(
+        model,
+        net,
+        arbitrage_discharge_mask,
+        battery_kwh,
+        discharge_eff,
+        charge_eff,
+    )
+
     soc = 0.0
     capacity = battery_kwh
 
     final_import = np.zeros_like(load)
     final_export = np.zeros_like(load)
+    charged_from_solar = 0.0
+    charged_from_grid = 0.0
+    discharged_to_load = 0.0
 
-    for i in range(len(net)):
-        if net[i] < 0:  # surplus
-            charge = min(-net[i], (capacity - soc) / charge_eff)
+    for i, value in enumerate(net):
+        if value < 0:
+            surplus = -float(value)
+            charge = min(surplus, (capacity - soc) / charge_eff, max_transfer)
             soc += charge * charge_eff
-            final_export[i] = -net[i] - charge
-        else:
-            discharge = 0.0
-            if soc > 0 and not night_mask[i]:
-                discharge = min(net[i], soc * discharge_eff)
+            charged_from_solar += charge
+            final_export[i] = surplus - charge
+            continue
+
+        need = float(value)
+        if soc > 0 and discharge_mask[i]:
+            discharge = min(need, soc * discharge_eff, max_transfer)
+            if discharge > 0:
                 soc -= discharge / discharge_eff
-            remaining = net[i] - discharge
-            final_import[i] = max(0, remaining)
+                discharged_to_load += discharge
+                need -= discharge
 
-            if allow_night_grid_charge and night_mask[i] and soc < capacity * 0.8:
-                needed = min(capacity * 0.8 - soc, 2.0)  # 2 kW limit
-                soc += needed * charge_eff
-                final_import[i] += needed
+        final_import[i] = max(0, need)
 
-    return {"import": final_import, "export": final_export}
+        if (
+            allow_night_grid_charge
+            and grid_charge_mask[i]
+            and grid_charge_is_economic
+            and soc < capacity
+        ):
+            target_day = target_date_for_interval(model.interval.index[i])
+            target_soc = grid_targets.get(target_day, 0.0)
+            if soc < target_soc:
+                charge = min(
+                    (target_soc - soc) / charge_eff,
+                    (capacity - soc) / charge_eff,
+                    max_transfer,
+                )
+                soc += charge * charge_eff
+                charged_from_grid += charge
+                final_import[i] += charge
+
+    return {
+        "import": final_import,
+        "export": final_export,
+        "battery_charged_from_solar_kwh": charged_from_solar,
+        "battery_charged_from_grid_kwh": charged_from_grid,
+        "battery_discharged_to_load_kwh": discharged_to_load,
+    }
 
 
 def calculate_supplier_cost(
@@ -405,47 +512,36 @@ def calculate_supplier_cost(
     load = interval["load"].to_numpy(dtype=float)
     solar = interval["solar"].to_numpy(dtype=float)
 
-    night_mask = get_night_mask(model, supplier.get("night_hours"))
+    rate_vector = get_import_rate_vector(supplier, model)
 
     if with_battery:
-        batt = simulate_battery_dispatch(model, BATTERY_KWH, night_mask)
+        batt = simulate_battery_dispatch(model, BATTERY_KWH, supplier)
         imp = batt["import"]
         exp = batt["export"]
+        battery_charged_from_solar = batt["battery_charged_from_solar_kwh"]
+        battery_charged_from_grid = batt["battery_charged_from_grid_kwh"]
+        battery_discharged_to_load = batt["battery_discharged_to_load_kwh"]
     else:
         net = load - solar
         imp = np.clip(net, 0, None)
         exp = np.clip(-net, 0, None)
+        battery_charged_from_solar = 0.0
+        battery_charged_from_grid = 0.0
+        battery_discharged_to_load = 0.0
 
-    # Electricity cost
-    peak_rate = supplier["peak_rate"]
-    offpeak_rate = supplier.get("offpeak_rate", peak_rate)
-    night_rate = supplier.get("night_rate", offpeak_rate)
     export_rate = supplier["export_rate"]
 
-    # Simple split: use night rate for EV portion during night hours
-    ev_home_annual = ev_energy["home_kwh"]
+    # Home EV charging is already part of the measured interval load. Only public
+    # DC charging is added separately because roof PV cannot offset it.
     ev_dc_annual = ev_energy["dc_kwh"]
 
-    # Rough split of import into night vs day
-    night_import = float(imp[night_mask].sum() * annual_factor)
-    day_import = float(imp[~night_mask].sum() * annual_factor)
-
-    # Apply night rate to portion of EV home charging
-    night_ev = ev_home_annual * 0.7  # assume 70% of home charging at night
-    day_ev = ev_home_annual * 0.3
-
     electricity_cost = (
-        (day_import - day_ev) * peak_rate
-        + (night_import - night_ev) * night_rate
-        + day_ev * night_rate
-        + night_ev * night_rate
+        float((imp * rate_vector).sum() * annual_factor)
         - float(exp.sum() * annual_factor) * export_rate
     )
 
     # Daily charges
-    daily_cost = (
-        model.days * supplier["daily_charge"] * annual_factor / model.days * 365.25
-    )
+    daily_cost = supplier["daily_charge"] * 365.25
 
     # DC charging
     dc_cost = ev_dc_annual * supplier["public_dc_rate"]
@@ -473,12 +569,24 @@ def calculate_supplier_cost(
         "plan_name": supplier["plan_name"],
         "with_battery": with_battery,
         "battery_kwh": BATTERY_KWH if with_battery else 0.0,
+        "annual_import_kwh": round(float(imp.sum() * annual_factor), 2),
+        "annual_export_kwh": round(float(exp.sum() * annual_factor), 2),
         "annual_electricity_cost_nzd": round(electricity_cost, 2),
         "annual_daily_charge_nzd": round(daily_cost, 2),
         "annual_dc_charging_nzd": round(dc_cost, 2),
         "annual_gas_cost_nzd": round(gas_cost, 2),
         "total_annual_cost_nzd": round(total, 2),
         "export_credit_nzd": round(float(exp.sum() * annual_factor) * export_rate, 2),
+        "battery_charged_from_solar_kwh": round(
+            battery_charged_from_solar * annual_factor, 2
+        ),
+        "battery_charged_from_grid_kwh": round(
+            battery_charged_from_grid * annual_factor, 2
+        ),
+        "battery_discharged_to_load_kwh": round(
+            battery_discharged_to_load * annual_factor, 2
+        ),
+        "low_usage_threshold_kwh": supplier.get("low_usage_threshold_kwh"),
     }
 
 
@@ -492,23 +600,96 @@ def run_full_comparison(model: ModelData) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def write_outputs(results: pd.DataFrame) -> None:
+def plan_family(plan_name: str) -> str:
+    return (
+        plan_name.replace(" - standard usage", "")
+        .replace(" - low usage", "")
+        .replace(" - low user", "")
+        .replace(" - standard user", "")
+    )
+
+
+def low_standard_comparison(results: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    working = results.copy()
+    working["plan_family"] = working["plan_name"].map(plan_family)
+
+    grouped = working[working["tariff"].isin(["low usage", "standard usage"])].groupby(
+        ["plan_family", "with_battery"]
+    )
+
+    for (family, with_battery), group in grouped:
+        low = group[group["tariff"] == "low usage"]
+        standard = group[group["tariff"] == "standard usage"]
+        if low.empty or standard.empty:
+            continue
+
+        low_row = low.sort_values("total_annual_cost_nzd").iloc[0]
+        standard_row = standard.sort_values("total_annual_cost_nzd").iloc[0]
+        difference = (
+            low_row["total_annual_cost_nzd"] - standard_row["total_annual_cost_nzd"]
+        )
+        rows.append(
+            {
+                "plan_family": family,
+                "with_battery": with_battery,
+                "modeled_annual_import_kwh": low_row["annual_import_kwh"],
+                "low_usage_cost_nzd": low_row["total_annual_cost_nzd"],
+                "standard_usage_cost_nzd": standard_row["total_annual_cost_nzd"],
+                "low_minus_standard_nzd": difference,
+                "cheaper_tariff": "low usage" if difference < 0 else "standard usage",
+                "listed_low_usage_threshold_kwh": low_row["low_usage_threshold_kwh"],
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def write_outputs(results: pd.DataFrame, low_standard: pd.DataFrame) -> None:
     with pd.ExcelWriter(OUTPUT_XLSX, engine="openpyxl") as writer:
         results.to_excel(writer, sheet_name="Supplier Comparison", index=False)
+        low_standard.to_excel(writer, sheet_name="Low vs Standard", index=False)
 
     # Markdown summary
+    summary_columns = [
+        "supplier",
+        "tariff",
+        "plan_name",
+        "with_battery",
+        "battery_kwh",
+        "annual_import_kwh",
+        "annual_export_kwh",
+        "annual_electricity_cost_nzd",
+        "annual_daily_charge_nzd",
+        "annual_dc_charging_nzd",
+        "annual_gas_cost_nzd",
+        "total_annual_cost_nzd",
+        "export_credit_nzd",
+        "battery_charged_from_grid_kwh",
+    ]
     lines = [
         "# Supplier Comparison Summary (PV + 2 EVs)",
         "",
         f"Battery size: {BATTERY_KWH} kWh",
+        f"Battery power limit: {BATTERY_POWER_LIMIT_KW} kW",
         "",
         "## Annual Costs",
         "",
     ]
-    lines.append(results.round(2).to_markdown(index=False))
+    lines.append(results[summary_columns].round(2).fillna("").to_markdown(index=False))
+    if not low_standard.empty:
+        lines.extend(
+            [
+                "",
+                "## Low vs Standard Usage",
+                "",
+                "Listed low-usage thresholds are shown as reference only; this table compares the modelled annual cost directly.",
+                "",
+                low_standard.round(2).fillna("").to_markdown(index=False),
+            ]
+        )
     lines.append("")
     lines.append(
-        "**Note:** Costs include electricity, daily charges, DC charging, gas (if applicable), discounts and rebates."
+        "**Note:** Costs include interval-priced home electricity, daily charges, public DC charging, gas (if applicable), discounts and rebates. Home EV charging is not added again because it is already part of measured home load."
     )
 
     OUTPUT_MARKDOWN.write_text("\n".join(lines), encoding="utf-8")
@@ -517,7 +698,8 @@ def write_outputs(results: pd.DataFrame) -> None:
 def main() -> None:
     model = build_model_data()
     results = run_full_comparison(model)
-    write_outputs(results)
+    low_standard = low_standard_comparison(results)
+    write_outputs(results, low_standard)
     print(f"Wrote {OUTPUT_XLSX}")
     print(f"Wrote {OUTPUT_MARKDOWN}")
     print("\nTop 5 cheapest options:")
