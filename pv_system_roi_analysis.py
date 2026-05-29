@@ -58,8 +58,8 @@ EV_CONTEXT = [
         "vehicle": "MG",
         "annual_km": 13_000,
         "kwh_per_km": 0.160,
-        "home_charge_pct": 0.65,
-        "dc_charge_pct": 0.35,
+        "home_charge_pct": 0.60,
+        "dc_charge_pct": 0.30,
         "start_date": date(2024, 12, 1),
     },
 ]

@@ -50,9 +50,7 @@ ADDED_PANEL_KW = 0.395
 CURRENT_ARRAY_SPARE_PANEL_SLOTS = 1
 CURRENT_SOLAR_KWP = CURRENT_PANEL_COUNT * CURRENT_PANEL_KW
 MAX_TOTAL_SOLAR_KWP_TO_HIGHLIGHT = 10.0
-
-# BYD Battery-Box Premium HVM usable capacities, one tower.
-BYD_HVM_USABLE_KWH = [0.0, 8.28, 11.04, 13.80, 16.56, 19.32, 22.08]
+BYD_HVM_USABLE_KWH = [0.0, 11.04, 13.80, 16.56, 19.32]
 EXTRA_LARGE_BATTERY_KWH = [27.60, 33.12, 38.64, 44.16]
 
 # The model is primarily an energy dispatch model. Leave this as None unless
