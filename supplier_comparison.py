@@ -10,6 +10,7 @@ Easy to update supplier rates in the SUPPLIERS list below.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import numpy as np
@@ -24,12 +25,13 @@ OUTPUT_MARKDOWN = OUTPUT_DIR / "supplier_comparison_summary.md"
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-BATTERY_KWH = 8.3
+BATTERY_KWH = 11
 BATTERY_POWER_LIMIT_KW = 5.0
+DEFAULT_PEAK_HOURS = (7, 21)
 
 EV_MILEAGE = {"Tesla": 26_000, "MG": 13_000}
-HOME_CHARGE_PCTS = {"Tesla": 0.65, "MG": 0.60}
-KWH_PER_KM = {"Tesla": 0.153, "MG": 0.190}
+HOME_CHARGE_PCTS = {"Tesla": 0.65, "MG": 0.65}
+KWH_PER_KM = {"Tesla": 0.153, "MG": 0.160}
 ROUND_TRIP_EFFICIENCY = 0.90
 
 # =============================================================================
@@ -321,6 +323,82 @@ SUPPLIERS = [
         "low_usage_threshold_kwh": 8000,
         "night_hours": (21, 7),
     },
+    # Powershop - standard usage special rates - updated 05/2026
+    {
+        "supplier": "Powershop",
+        "tariff": "standard usage",
+        "plan_name": "Powershop - standard usage - Special rates",
+        "peak_rate": 0.3794,
+        "offpeak_rate": 0.2334,
+        "night_rate": 0.2334,
+        "daily_charge": 2.806,
+        "export_rate": 0.13,
+        "public_dc_rate": 0.85,
+        "gas": False,
+        "bottle_charge_per_year": 0,
+        "bottle_rental_per_year": 0,
+        "dual_fuel_discount": 0.0,
+        "rebate": 0,
+        "low_usage_threshold_kwh": 8000,
+        "night_hours": (21, 7),
+    },
+    # Powershop - standard usage std rates - updated 05/2026
+    {
+        "supplier": "Powershop",
+        "tariff": "standard usage",
+        "plan_name": "Powershop - Standard usage - Standard rates",
+        "peak_rate": 0.4152,
+        "offpeak_rate": 0.2692,
+        "night_rate": 0.2692,
+        "daily_charge": 2.806,
+        "export_rate": 0.13,
+        "public_dc_rate": 0.85,
+        "gas": False,
+        "bottle_charge_per_year": 0,
+        "bottle_rental_per_year": 0,
+        "dual_fuel_discount": 0.0,
+        "rebate": 0,
+        "low_usage_threshold_kwh": 8000,
+        "night_hours": (21, 7),
+    },
+    # Powershop - low usage special rates - updated 05/2026
+    {
+        "supplier": "Powershop",
+        "tariff": "low usage",
+        "plan_name": "Powershop - Low usage - Special rates",
+        "peak_rate": 0.4182,
+        "offpeak_rate": 0.2722,
+        "night_rate": 0.2722,
+        "daily_charge": 1.995,
+        "export_rate": 0.13,
+        "public_dc_rate": 0.85,
+        "gas": False,
+        "bottle_charge_per_year": 0,
+        "bottle_rental_per_year": 0,
+        "dual_fuel_discount": 0.0,
+        "rebate": 0,
+        "low_usage_threshold_kwh": 8000,
+        "night_hours": (21, 7),
+    },
+    # Powershop - low usage std rates - updated 05/2026
+    {
+        "supplier": "Powershop",
+        "tariff": "low usage",
+        "plan_name": "Powershop - Low usage - Standard rates",
+        "peak_rate": 0.4539,
+        "offpeak_rate": 0.3079,
+        "night_rate": 0.3079,
+        "daily_charge": 1.995,
+        "export_rate": 0.13,
+        "public_dc_rate": 0.85,
+        "gas": False,
+        "bottle_charge_per_year": 0,
+        "bottle_rental_per_year": 0,
+        "dual_fuel_discount": 0.0,
+        "rebate": 0,
+        "low_usage_threshold_kwh": 8000,
+        "night_hours": (21, 7),
+    },
 ]
 
 # =============================================================================
@@ -338,14 +416,22 @@ def calculate_annual_ev_energy() -> dict:
     return {"home_kwh": total_home, "dc_kwh": total_dc}
 
 
-def get_night_mask(model: ModelData, night_hours: tuple | None) -> np.ndarray:
-    if night_hours is None:
+def get_hour_mask(model: ModelData, hours_window: tuple | None) -> np.ndarray:
+    if hours_window is None:
         return np.zeros(len(model.interval), dtype=bool)
-    start, end = night_hours
+    start, end = hours_window
     hours = model.interval.index.hour
     if start < end:
         return (hours >= start) & (hours < end)
     return (hours >= start) | (hours < end)
+
+
+def get_night_mask(model: ModelData, night_hours: tuple | None) -> np.ndarray:
+    return get_hour_mask(model, night_hours)
+
+
+def get_peak_mask(model: ModelData, supplier: dict) -> np.ndarray:
+    return get_hour_mask(model, supplier.get("peak_hours", DEFAULT_PEAK_HOURS))
 
 
 def get_import_rate_vector(supplier: dict, model: ModelData) -> np.ndarray:
@@ -354,15 +440,20 @@ def get_import_rate_vector(supplier: dict, model: ModelData) -> np.ndarray:
     offpeak_rate = supplier.get("offpeak_rate", peak_rate)
     night_rate = supplier.get("night_rate", offpeak_rate)
 
-    rates = np.where(model.is_peak, peak_rate, offpeak_rate).astype(float)
+    rates = np.where(get_peak_mask(model, supplier), peak_rate, offpeak_rate).astype(
+        float
+    )
     night_mask = get_night_mask(model, supplier.get("night_hours"))
     rates[night_mask] = night_rate
     return rates
 
 
-def target_date_for_interval(timestamp: pd.Timestamp) -> object:
+def target_date_for_interval(
+    timestamp: pd.Timestamp,
+    peak_start_hour: int = DEFAULT_PEAK_HOURS[0],
+) -> object:
     """Map cheap overnight charging intervals to the peak/discharge date covered."""
-    if timestamp.hour < 7:
+    if timestamp.hour < peak_start_hour:
         return timestamp.date()
     return (timestamp + pd.Timedelta(days=1)).date()
 
@@ -481,7 +572,8 @@ def simulate_battery_dispatch(
             and grid_charge_is_economic
             and soc < capacity
         ):
-            target_day = target_date_for_interval(model.interval.index[i])
+            peak_hours = supplier.get("peak_hours", DEFAULT_PEAK_HOURS)
+            target_day = target_date_for_interval(model.interval.index[i], peak_hours[0])
             target_soc = grid_targets.get(target_day, 0.0)
             if soc < target_soc:
                 charge = min(
@@ -601,12 +693,13 @@ def run_full_comparison(model: ModelData) -> pd.DataFrame:
 
 
 def plan_family(plan_name: str) -> str:
-    return (
-        plan_name.replace(" - standard usage", "")
-        .replace(" - low usage", "")
-        .replace(" - low user", "")
-        .replace(" - standard user", "")
+    family = re.sub(
+        r"\s+-\s+(standard|low)\s+(usage|user)",
+        "",
+        plan_name,
+        flags=re.IGNORECASE,
     )
+    return re.sub(r"\s+", " ", family).strip()
 
 
 def low_standard_comparison(results: pd.DataFrame) -> pd.DataFrame:
@@ -696,7 +789,10 @@ def write_outputs(results: pd.DataFrame, low_standard: pd.DataFrame) -> None:
 
 
 def main() -> None:
-    model = build_model_data()
+    model = build_model_data(
+        peak_start_hour=DEFAULT_PEAK_HOURS[0],
+        peak_end_hour=DEFAULT_PEAK_HOURS[1],
+    )
     results = run_full_comparison(model)
     low_standard = low_standard_comparison(results)
     write_outputs(results, low_standard)

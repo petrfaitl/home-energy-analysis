@@ -74,6 +74,8 @@ class ModelData:
     start_day: pd.Timestamp
     end_day: pd.Timestamp
     days: int
+    peak_start_hour: int
+    peak_end_hour: int
     is_peak: np.ndarray
     date_values: np.ndarray
     unique_dates: list
@@ -114,7 +116,10 @@ def last_complete_day(timestamp: pd.Timestamp) -> pd.Timestamp:
     return pd.Timestamp(timestamp.date()) - pd.Timedelta(days=1)
 
 
-def build_model_data() -> ModelData:
+def build_model_data(
+    peak_start_hour: int = PEAK_START_HOUR,
+    peak_end_hour: int = PEAK_END_HOUR,
+) -> ModelData:
     raw = {
         name: load_cumulative_meter(path, unit, name)
         for name, (path, unit) in INPUT_FILES.items()
@@ -143,8 +148,8 @@ def build_model_data() -> ModelData:
     negative_load_bins = int(negative.sum())
 
     interval["load"] = reconstructed_load.clip(lower=0)
-    interval["is_peak"] = (interval.index.hour >= PEAK_START_HOUR) & (
-        interval.index.hour < PEAK_END_HOUR
+    interval["is_peak"] = (interval.index.hour >= peak_start_hour) & (
+        interval.index.hour < peak_end_hour
     )
     interval["period"] = np.where(interval["is_peak"], "Peak", "Off-Peak")
     interval["date"] = [d.isoformat() for d in interval.index.date]
@@ -159,9 +164,9 @@ def build_model_data() -> ModelData:
 
     target_date_by_interval = {}
     for i, timestamp in enumerate(interval.index):
-        if timestamp.hour < PEAK_START_HOUR:
+        if timestamp.hour < peak_start_hour:
             target_date_by_interval[i] = timestamp.date()
-        elif timestamp.hour >= PEAK_END_HOUR:
+        elif timestamp.hour >= peak_end_hour:
             target_date_by_interval[i] = (timestamp + pd.Timedelta(days=1)).date()
 
     return ModelData(
@@ -169,6 +174,8 @@ def build_model_data() -> ModelData:
         start_day=start_day,
         end_day=end_day,
         days=len(unique_dates),
+        peak_start_hour=peak_start_hour,
+        peak_end_hour=peak_end_hour,
         is_peak=is_peak,
         date_values=date_values,
         unique_dates=unique_dates,
@@ -179,16 +186,22 @@ def build_model_data() -> ModelData:
     )
 
 
-def bill_cost(import_kwh: np.ndarray, export_kwh: np.ndarray, model: ModelData) -> dict:
+def bill_cost(
+    import_kwh: np.ndarray,
+    export_kwh: np.ndarray,
+    model: ModelData,
+    rates: dict | None = None,
+) -> dict:
+    chosen_rates = RATES if rates is None else {**RATES, **rates}
     peak_import = float(import_kwh[model.is_peak].sum())
     offpeak_import = float(import_kwh[~model.is_peak].sum())
     export = float(export_kwh.sum())
     energy_cost = (
-        offpeak_import * RATES["offpeak_import"]
-        + peak_import * RATES["peak_import"]
-        - export * RATES["export"]
+        offpeak_import * chosen_rates["offpeak_import"]
+        + peak_import * chosen_rates["peak_import"]
+        - export * chosen_rates["export"]
     )
-    fixed_cost = model.days * RATES["daily"]
+    fixed_cost = model.days * chosen_rates["daily"]
     return {
         "offpeak_import_kwh": offpeak_import,
         "peak_import_kwh": peak_import,
@@ -239,6 +252,7 @@ def simulate_scenario(
     total_solar_kwp: float,
     battery_kwh: float,
     allow_offpeak_grid_charge: bool,
+    rates: dict | None = None,
 ) -> dict:
     """Replay household load against a solar/battery configuration."""
     interval = model.interval
@@ -309,7 +323,7 @@ def simulate_scenario(
             grid_charge_kwh += charge_ac
             import_kwh[i] += charge_ac
 
-    cost = bill_cost(import_kwh, export_kwh, model)
+    cost = bill_cost(import_kwh, export_kwh, model, rates=rates)
     cost.update(
         {
             "total_solar_kwp": total_solar_kwp,
